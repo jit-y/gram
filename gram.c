@@ -24,6 +24,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 enum editorKey {
+  BACKSPACE = 127,
   ARROW_LEFT = 1000,
   ARROW_RIGHT,
   ARROW_UP,
@@ -239,6 +240,24 @@ void editorAppendRow(char *s, size_t len) {
   E.numrows++;
 }
 
+void editorRowInsertChar(erow *row, int at, int c) {
+  if (at < 0 || at > row->size) at = row->size;
+  row->chars = realloc(row->chars, row->size + 2);
+  memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
+  row->size++;
+  row->chars[at] = c;
+  editorUpdateRow(row);
+}
+
+/* editor operations */
+
+void editorInsertChar(int c) {
+  if (E.cy == E.numrows) {
+    editorAppendRow("", 0);
+  }
+  editorRowInsertChar(&E.row[E.cy], E.cx, c);
+  E.cx++;
+}
 
 /* file i/o */
 
@@ -414,6 +433,7 @@ void editorMoveCursor(int key) {
 
   switch (key) {
     case ARROW_LEFT:
+    case CTRL_KEY('b'):
       if (E.cx != 0) {
         E.cx--;
       } else if (E.cy > 0) {
@@ -422,6 +442,7 @@ void editorMoveCursor(int key) {
       }
       break;
     case ARROW_RIGHT:
+    case CTRL_KEY('f'):
       if (row && E.cx < row->size) {
         E.cx++;
       } else if (row && E.cx == row->size) {
@@ -430,11 +451,13 @@ void editorMoveCursor(int key) {
       }
       break;
     case ARROW_UP:
+    case CTRL_KEY('p'):
       if (E.cy != 0) {
         E.cy--;
       }
       break;
     case ARROW_DOWN:
+    case CTRL_KEY('n'):
       if (E.cy < E.numrows) {
         E.cy++;
       }
@@ -452,6 +475,9 @@ void editorProcessKeypress() {
   int c = editorReadKey();
 
   switch(c) {
+    case '\r':
+      // TODO
+      break;
     case CTRL_KEY('q'):
       write(STDOUT_FILENO, "\x1b[2J", 4);
       write(STDOUT_FILENO, "\x1b[H", 3);
@@ -460,12 +486,20 @@ void editorProcessKeypress() {
       break;
 
     case HOME_KEY:
+    case CTRL_KEY('a'):
       E.cx = 0;
       break;
 
     case END_KEY:
+    case CTRL_KEY('e'):
       if (E.cy < E.numrows)
         E.cx = E.row[E.cy].size;
+      break;
+
+    case BACKSPACE:
+    case CTRL_KEY('h'):
+    case DEL_KEY:
+      // TODO
       break;
 
     case PAGE_UP:
@@ -485,10 +519,22 @@ void editorProcessKeypress() {
       }
 
     case ARROW_UP:
+    case CTRL_KEY('p'):
     case ARROW_DOWN:
+    case CTRL_KEY('n'):
     case ARROW_LEFT:
+    case CTRL_KEY('b'):
     case ARROW_RIGHT:
+    case CTRL_KEY('f'):
       editorMoveCursor(c);
+      break;
+
+    case CTRL_KEY('l'):
+    case '\x1b':
+      break;
+
+    default:
+      editorInsertChar(c);
       break;
   }
 }
